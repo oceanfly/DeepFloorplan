@@ -1,14 +1,19 @@
 import argparse
 import numpy as np
-from scipy.misc import imread, imsave, imresize
+# from scipy.misc import imread, imsave, imresize
+import cv2
+from imageio import imread, imsave
+
+from net import *
 
 import os
 import sys
 import glob
 import time
 
-sys.path.append('./utils/')
-from metrics import fast_hist
+sys.path.append('/Users/taosun/Documents/GitHub/DeepFloorplan/utils/')
+
+from util import fast_hist
 from rgb_ind_convertor import *
 
 parser = argparse.ArgumentParser()
@@ -33,28 +38,40 @@ def evaluate_semantic(benchmark_path, result_dir, num_of_classes=11, need_merge_
 	n = len(im_paths)
 	# n = 1
 	hist = np.zeros((num_of_classes, num_of_classes))
-	for i in xrange(n):
-		im = imread(im_paths[i], mode='RGB')
+	for i in range(n):
+		# im = imread(im_paths[i], mode='RGB')
+		im = cv2.imread(im_paths[i])
 		if need_merge_result:
-			im_d = imread(im_d_paths[i], mode='L')
-			im_cw = imread(im_cw_paths[i], mode='L')
+			# im_d = imread(im_d_paths[i], mode='L')  # black and white
+			im_d = cv2.imread(m_d_paths[i])  
+			# im_cw = imread(im_cw_paths[i], mode='L')
+			im_cw = cv2.imread(im_cw_paths[i])
 		# create fuse semantic label
-		cw = imread(cw_paths[i], mode='L')
-		dd = imread(d_paths[i], mode='L')
-		rr = imread(r_paths[i], mode='RGB')
-
+		# cw = imread(cw_paths[i], mode='L')
+		cw = cv2.imread(cw_paths[i])
+		# dd = imread(d_paths[i], mode='L')
+		dd = cv2.imread(d_paths[i])
+		# rr = imread(r_paths[i], mode='RGB')
+		rr = cv2.imread(r_paths[i])
+	
 		if im_downsample:
-			im = imresize(im, (512, 512, 3))
+			# im = imresize(im, (512, 512, 3))
+			im = cv2.resize(im, dsize=(512, 512), interpolation=cv2.INTER_CUBIC)
 			if need_merge_result:
-				im_d = imresize(im_d, (512, 512))
-				im_cw = imresize(im_cw, (512, 512))
+				# im_d = imresize(im_d, (512, 512))
+				im_d = cv2.resize(im_d, dsize=(512, 512), interpolation=cv2.INTER_CUBIC)
+				# im_cw = imresize(im_cw, (512, 512))
+				im_cw = cv2.resize(im_cw, dsize=(512, 512), interpolation=cv2.INTER_CUBIC)
 				im_d = im_d / 255
 				im_cw = im_cw / 255
 
 		if gt_downsample:
-			cw = imresize(cw, (512, 512))
-			dd = imresize(dd, (512, 512))
-			rr = imresize(rr, (512, 512, 3))
+			# cw = imresize(cw, (512, 512))
+			cw = cv2.resize(cw, dsize=(512, 512), interpolation=cv2.INTER_CUBIC)
+			# dd = imresize(dd, (512, 512))
+			dd = cv2.resize(dd, dsize=(512, 512), interpolation=cv2.INTER_CUBIC)
+			# rr = imresize(rr, (512, 512, 3))
+			rr = cv2.resize(rr, dsize=(512, 512), interpolation=cv2.INTER_CUBIC)
 
 		# normalize
 		cw = cw / 255
@@ -82,28 +99,28 @@ def evaluate_semantic(benchmark_path, result_dir, num_of_classes=11, need_merge_
 		name = im_paths[i].split('/')[-1]
 		r_name = r_paths[i].split('/')[-1]
 		
-		print 'Evaluating {}(im) <=> {}(gt)...'.format(name, r_name)
+		print('Evaluating {}(im) <=> {}(gt)...'.format(name, r_name))
 
 		hist += fast_hist(im_ind.flatten(), rr_ind.flatten(), num_of_classes)
 
-	print '*'*60
+	print ('*'*60)
 	# overall accuracy
 	acc = np.diag(hist).sum() / hist.sum()
-	print 'overall accuracy {:.4}'.format(acc)
+	print('overall accuracy {:.4}'.format(acc))
 	# per-class accuracy, avoid div zero
 	acc = np.diag(hist) / (hist.sum(1) + 1e-6)
-	print 'room-type: mean accuracy {:.4}, room-type+bd: mean accuracy {:.4}'.format(np.nanmean(acc[:7]), (np.nansum(acc[:7])+np.nansum(acc[-2:]))/9.)
+	print('room-type: mean accuracy {:.4}, room-type+bd: mean accuracy {:.4}'.format(np.nanmean(acc[:7]), (np.nansum(acc[:7])+np.nansum(acc[-2:]))/9.))
 	for t in xrange(0, acc.shape[0]):
 		if t not in [7, 8]:
-			print 'room type {}th, accuracy = {:.4}'.format(t, acc[t])
+			print('room type {}th, accuracy = {:.4}'.format(t, acc[t]))
 
-	print '*'*60
+	print('*'*60)
 	# per-class IU, avoid div zero
 	iu = np.diag(hist) / (hist.sum(1) + 1e-6 + hist.sum(0) - np.diag(hist))
-	print 'room-type: mean IoU {:.4}, room-type+bd: mean IoU {:.4}'.format(np.nanmean(iu[:7]), (np.nansum(iu[:7])+np.nansum(iu[-2:]))/9.)
+	print('room-type: mean IoU {:.4}, room-type+bd: mean IoU {:.4}'.format(np.nanmean(iu[:7]), (np.nansum(iu[:7])+np.nansum(iu[-2:]))/9.))
 	for t in xrange(iu.shape[0]):
 		if t not in [7,8]: # ignore class 7 & 8
-			print 'room type {}th, IoU = {:.4}'.format(t, iu[t])
+			print('room type {}th, IoU = {:.4}'.format(t, iu[t]))
 
 if __name__ == '__main__':
 	FLAGS, unparsed = parser.parse_known_args()
@@ -118,5 +135,5 @@ if __name__ == '__main__':
 	tic = time.time()
 	evaluate_semantic(benchmark_path, result_dir, need_merge_result=False, im_downsample=False, gt_downsample=True) # same as previous line but 11 classes by combining the opening and wall line
 
-	print "*"*60
-	print "Evaluate time: {} sec".format(time.time()-tic)
+	print("*"*60)
+	print("Evaluate time: {} sec".format(time.time()-tic))

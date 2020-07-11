@@ -1,11 +1,20 @@
 import argparse
 from net import *
 
+import tensorflow.compat.v1 as tf
+
+sys.path.append('/Users/taosun/Documents/GitHub/DeepFloorplan/utils/')
+from rgb_ind_convertor import *
+
+tf.disable_v2_behavior() 
+
 os.environ['CUDA_VISIBLE_DEVICES'] = GPU_ID
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 seed = 8964
+
+basepath = "/Users/taosun/Documents/GitHub/DeepFloorplan/"
 
 # input image path
 parser = argparse.ArgumentParser()
@@ -17,8 +26,8 @@ class MODEL(Network):
 	"""docstring for MODEL"""
 	def __init__(self):
 		Network.__init__(self)
-		self.log_dir = 'pretrained'
-		self.eval_file = './dataset/r3d_test.txt'		
+		self.log_dir = basepath + 'pretrained'
+		self.eval_file = basepath + 'dataset/r3d_test.txt'		
 		self.loss_type = 'balanced'
 
 	def convert_one_hot_to_image(self, one_hot, dtype='float', act=None):
@@ -58,19 +67,19 @@ class MODEL(Network):
 
 		m_c = [] # index mask
 		n_c = [] # each class foreground pixels
-		for c in xrange(num_classes):
+		for c in range(num_classes):
 			m_c.append(tf.cast(tf.equal(ind, c), dtype=tf.int32))
 			n_c.append(tf.cast(tf.reduce_sum(m_c[-1]), dtype=tf.float32))
 
 		# compute count
 		c = []
-		for i in xrange(num_classes):
+		for i in range(num_classes):
 			c.append(total - n_c[i])
 		tc = tf.add_n(c)
 
 		# use for compute loss
 		loss = 0.
-		for i in xrange(num_classes): 
+		for i in range(num_classes): 
 			w = c[i] / tc
 			m_c_one_hot = tf.one_hot((i*m_c[i]), num_classes, axis=-1)
 			y_c = m_c_one_hot*y
@@ -85,7 +94,7 @@ class MODEL(Network):
 		labels_cw_hot  = loader_dict['label_boundaries']
 
 		max_ep = max_step // num_batch
-		print 'max_step = {}, max_ep = {}, num_batch = {}'.format(max_step, max_ep, num_batch)
+		print ('max_step = {}, max_ep = {}, num_batch = {}'.format(max_step, max_ep, num_batch))
 
 		logits1, logits2 = self.forward(images, init_with_pretrain_vgg=False)
 
@@ -134,11 +143,11 @@ class MODEL(Network):
 			# start queue 
 			threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
-			print "Start Training!"
+			print("Start Training!")
 			total_times = 0			
 
-			for ep in xrange(max_ep): # epoch loop
-				for n in xrange(num_batch): # batch loop
+			for ep in range(max_ep): # epoch loop
+				for n in range(num_batch): # batch loop
 					tic = time.time()
 					# [loss_value, update_value, summaries] = sess.run([loss, optim, merged])	
 					[loss_value, update_value] = sess.run([loss, optim])	
@@ -148,8 +157,8 @@ class MODEL(Network):
 
 					step = int(ep*num_batch + n)
 					# write log 
-					print 'step {}: loss = {:.3}; {:.2} data/sec, excuted {} minutes'.format(step,
-						loss_value, 1.0/duration, int(total_times/60))
+					print('step {}: loss = {:.3}; {:.2} data/sec, excuted {} minutes'.format(step,
+						loss_value, 1.0/duration, int(total_times/60)))
 					# writer.add_summary(summaries, global_step=step)
 				# save model parameters after 2 epoch training
 				if ep % 2 == 0:
@@ -164,7 +173,7 @@ class MODEL(Network):
 			sess.close()	
 
 	def infer(self, save_dir='out', resize=True, merge=True):
-		print "generating test set of {}.... will save to [./{}]".format(self.eval_file, save_dir)
+		print("generating test set of {}.... will save to [./{}]".format(self.eval_file, save_dir))
 		room_dir = os.path.join(save_dir, 'room')
 		close_wall_dir = os.path.join(save_dir, 'boundary')
 
@@ -193,18 +202,28 @@ class MODEL(Network):
 		paths = open(self.eval_file, 'r').read().splitlines()
 		paths = [p.split('\t')[0] for p in paths]	
 		for p in paths:
-			im = imread(p, mode='RGB')  
-			im_x = imresize(im, (512,512,3)) / 255. # resize and normalize
+			# im = imread(p, mode='RGB')  
+			# im_x = imresize(im, (512,512,3)) / 255. # resize and normalize
+			# im_x = np.reshape(im_x, (1,512,512,3))
+
+			p = basepath + p[3:]
+			print("loading image: ", p)
+			im = cv2.imread(p)
+			im_x = cv2.resize(im, dsize=(512, 512), interpolation=cv2.INTER_CUBIC)
+			im_x = im_x / 255
 			im_x = np.reshape(im_x, (1,512,512,3))
 
 			[out1, out2] = sess.run([rooms, close_walls], feed_dict={x: im_x})
+
 			if resize:
 				# out1 = imresize(np.squeeze(out1), (im.shape[0], im.shape[1])) # resize back 
 				# out2 = imresize(np.squeeze(out2), (im.shape[0], im.shape[1])) # resize back 
 				out1_rgb = ind2rgb(np.squeeze(out1))
-				out1_rgb = imresize(out1_rgb, (im.shape[0], im.shape[1])) # resize back 
+				# out1_rgb = imresize(out1_rgb, (im.shape[0], im.shape[1])) # resize back 
+				out1_rgb = cv2.resize(out1_rgb, (im.shape[0], im.shape[1])) # resize back 
 				out2_rgb = ind2rgb(np.squeeze(out2), color_map=floorplan_boundary_map)
-				out2_rgb = imresize(out2_rgb, (im.shape[0], im.shape[1])) # resize back 
+				# out2_rgb = imresize(out2_rgb, (im.shape[0], im.shape[1])) # resize back 
+				out2_rgb = cv2.resize(out2_rgb, (im.shape[0], im.shape[1])) # resize back 
 			else:
 				out1_rgb = ind2rgb(np.squeeze(out1))
 				out2_rgb = ind2rgb(np.squeeze(out2), color_map=floorplan_boundary_map)
@@ -228,7 +247,7 @@ class MODEL(Network):
 				imsave(save_path3, out3_rgb)
 			# imsave(save_path4, out4)
 			
-			print 'Saving prediction: {}'.format(name)	
+			print('Saving prediction: {}'.format(name))
 
 	def evaluate(self, sess, epoch, num_of_classes=11):
 		x = tf.placeholder(shape=[1, 512, 512, 3], dtype=tf.float32)
@@ -299,7 +318,7 @@ def main(args):
 		tic = time.time()
 		model.train(loader_dict, num_batch)
 		toc = time.time()
-		print 'total training + evaluation time = {} minutes'.format((toc-tic)/60)
+		print('total training + evaluation time = {} minutes'.format((toc-tic)/60))
 	elif args.phase.lower() == 'test':	
 		model.infer()
 	else:

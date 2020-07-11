@@ -1,8 +1,14 @@
 import numpy as np
 
-import tensorflow as tf
+# import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior() 
 
-from scipy.misc import imread, imresize, imsave
+# from scipy.misc import imread, imresize, imsave
+import cv2
+from imageio import imread, imsave
+
+
 from matplotlib import pyplot as plt
 from rgb_ind_convertor import *
 
@@ -312,9 +318,12 @@ def read_bd_rm_record(data_path, batch_size=1, size=512):
 				'boundary': tf.FixedLenFeature(shape=(), dtype=tf.string),
 				'room': tf.FixedLenFeature(shape=(), dtype=tf.string),
 				'door': tf.FixedLenFeature(shape=(), dtype=tf.string)}
+	
+	print("data_path=",data_path)
 
 	# Create a list of filenames and pass it to a queue
 	filename_queue = tf.train.string_input_producer([data_path], num_epochs=None, shuffle=False, capacity=batch_size*128)
+	# filename_queue = tf.data.Dataset.from_tensor_slices([data_path]).shuffle(tf.shape([data_path], out_type=tf.int64)[0]).repeat(None)
 	
 	# Define a reader and read the next record
 	reader = tf.TFRecordReader()

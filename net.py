@@ -1,7 +1,10 @@
 import numpy as np
-import tensorflow as tf # using tf 1.10.1
+# import tensorflow as tf # using tf 1.10.1
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior() 
 
-from tensorflow.contrib.slim.nets import vgg
+# from tensorflow.contrib.slim.nets import vgg
+from tensorflow.python.compiler.tensorrt import trt_convert as trt
 
 import os
 import sys
@@ -10,19 +13,21 @@ import time
 import random
 
 from scipy import ndimage
-from scipy.misc import imread, imresize, imsave
+# from scipy.misc import imread, imresize, imsave
+import cv2
+from imageio import imread, imsave
 
-sys.path.append('./utils/')
-from rgb_ind_convertor import *
+sys.path.append('/Users/taosun/Documents/GitHub/DeepFloorplan/utils/')
+# from rgb_ind_convertor import *
 from util import fast_hist
 from tf_record import read_record, read_bd_rm_record
 
 GPU_ID = '0'
 
 def data_loader_bd_rm_from_tfrecord(batch_size=1):
-	paths = open('../dataset/r3d_train.txt', 'r').read().splitlines()
+	paths = open('/Users/taosun/Documents/GitHub/DeepFloorplan/dataset/r3d_train.txt', 'r').read().splitlines()
 
-	loader_dict = read_bd_rm_record('../dataset/r3d.tfrecords', batch_size=batch_size, size=512)
+	loader_dict = read_bd_rm_record('/Users/taosun/Documents/GitHub/DeepFloorplan/dataset/r3d.tfrecords', batch_size=batch_size, size=512)
 
 	num_batch = len(paths) // batch_size
 
@@ -31,7 +36,7 @@ def data_loader_bd_rm_from_tfrecord(batch_size=1):
 class Network(object):
 	"""docstring for Network"""
 	def __init__(self, dtype=tf.float32):
-		print 'Initial nn network object...'
+		print('Initial nn network object...')
 		self.dtype = dtype
 		self.pre_train_restore_map = {'vgg_16/conv1/conv1_1/weights':'FNet/conv1_1/W', # {'checkpoint_scope_var_name':'current_scope_var_name'} shape must be the same
 									'vgg_16/conv1/conv1_1/biases':'FNet/conv1_1/b',	
