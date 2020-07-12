@@ -30,7 +30,8 @@ floorplan_boundary_map_figure = {
 # merge all label into one multi-class label
 floorplan_fuse_map = {
 	0: [  0,  0,  0], # background
-	1: [192,192,224], # closet
+	# 1: [192,192,224], # closet
+	1: [255,224,128], # closet -> bedroom
 	2: [192,255,255], # batchroom/washroom
 	3: [224,255,192], # livingroom/kitchen/dining room
 	4: [255,224,128], # bedroom
@@ -45,7 +46,8 @@ floorplan_fuse_map = {
 # invert the color of wall line and background for presentation
 floorplan_fuse_map_figure = {
 	0: [255,255,255], # background
-	1: [192,192,224], # closet
+	# 1: [192,192,224], # closet
+	1: [255,224,128], # closet -> bedroom
 	2: [192,255,255], # batchroom/washroom
 	3: [224,255,192], # livingroom/kitchen/dining room
 	4: [255,224,128], # bedroom
@@ -60,7 +62,7 @@ floorplan_fuse_map_figure = {
 def rgb2ind(im, color_map=floorplan_room_map):
 	ind = np.zeros((im.shape[0], im.shape[1]))
 
-	for i, rgb in color_map.iteritems():
+	for i, rgb in color_map.items():
 		ind[(im==rgb).all(2)] = i
 
 	# return ind.astype(int) # int => int64

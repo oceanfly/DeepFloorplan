@@ -7,10 +7,12 @@ import time
 import random
 
 import numpy as np
-from scipy.misc import imread, imresize, imsave
+# from scipy.misc import imread, imresize, imsave
+import cv2
+from imageio import imread, imsave
 from matplotlib import pyplot as plt
 
-sys.path.append('./utils/')
+sys.path.append('/Users/taosun/Documents/GitHub/DeepFloorplan/utils/')
 from rgb_ind_convertor import *
 from util import *
 
@@ -29,23 +31,36 @@ def post_process(input_dir, save_dir, merge=True):
 
 	n = len(input_paths)
 	# n = 1
-	for i in xrange(n):
-		im = imread(input_paths[i], mode='RGB')
+	for i in range(n):
+		# im = imread(input_paths[i], mode='RGB')
+		print("input_path=", input_paths[i])
+		im = cv2.imread(input_paths[i])
+		# opencv is reading image in BGR not RGB. A conversion BGR2RGB is needed
+		im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB) 
 		im_ind = rgb2ind(im, color_map=floorplan_fuse_map)
 		# seperate image into room-seg & boundary-seg
 		rm_ind = im_ind.copy()
 		rm_ind[im_ind==9] = 0
 		rm_ind[im_ind==10] = 0
 
+		rm_rgb = ind2rgb(rm_ind, color_map=floorplan_fuse_map)
+		cv2.imshow('rm_rgb', rm_rgb)
+		cv2.waitKey(0)
+
 		bd_ind = np.zeros(im_ind.shape, dtype=np.uint8)
 		bd_ind[im_ind==9] = 9
 		bd_ind[im_ind==10] = 10
+
+		bd_rgb = ind2rgb(bd_ind, color_map=floorplan_fuse_map)
+		cv2.imshow('bd_rgb', bd_rgb)
+		cv2.waitKey(0)
 
 		hard_c = (bd_ind>0).astype(np.uint8)
 
 		# region from room prediction it self
 		rm_mask = np.zeros(rm_ind.shape)
 		rm_mask[rm_ind>0] = 1			
+
 		# region from close_wall line		
 		cw_mask = hard_c
 		# refine close wall mask by filling the grap between bright line	
@@ -58,13 +73,17 @@ def post_process(input_dir, save_dir, merge=True):
 		fuse_mask = flood_fill(fuse_mask)
 		fuse_mask = fuse_mask // 255	
 
-		# one room one label
+		# one room one label  -- at this step, all the rooms are segmented by solid boundary
 		new_rm_ind = refine_room_region(cw_mask, rm_ind)
+
+		new_rgb = ind2rgb(new_rm_ind, color_map=floorplan_fuse_map)
+		cv2.imshow('new_rgb', new_rgb)
+		cv2.waitKey(0)
 
 		# ignore the background mislabeling
 		new_rm_ind = fuse_mask*new_rm_ind
 
-		print 'Saving {}th refined room prediciton to {}'.format(i, out_paths[i])
+		print('Saving {}th refined room prediciton to {}'.format(i, out_paths[i]))
 		if merge:
 			new_rm_ind[bd_ind==9] = 9
 			new_rm_ind[bd_ind==10] = 10
